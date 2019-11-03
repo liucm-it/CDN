@@ -1,0 +1,515 @@
+﻿<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>HTML5 Canvas 五彩发光喷泉动画DEMO演示</title>
+
+<script src="js/jquery.min.js"></script>
+
+<style>
+html, body{
+	width: 100%;
+	height: 100%;
+	margin: 0;
+	padding: 0;
+	background: #000;
+	overflow: hidden;
+}
+.container{
+	width: 100%;
+	height: 100%;
+	margin: 0;
+	padding: 0;
+	background-color: #000000;
+}
+canvas {
+	position: absolute;
+	top: 0;
+	left: 0;
+}
+</style>
+
+</head>
+<body>
+
+<div id="jsi-fountain-container" class="container">
+
+</div>
+<canvas id="canvas"></canvas>
+<script>
+var txt = "我的知识时光";
+var txtH = 70;
+var font = "sans-serif";
+var bg = "#ccc";
+var rayColor1 = "#e0f7fa";
+var rayColor2 = "#18ffff";
+var fade = 1000;
+
+var canvas = document.getElementById("canvas");
+var ctx = canvas.getContext("2d");
+var cw = canvas.width = window.innerWidth;
+var ch = canvas.height = window.innerHeight;
+
+var w2 = cw/2;
+var h2 = ch/2;
+var pi = Math.PI;
+var pi2 = pi*.5;
+
+var txtCanvas = document.createElement("canvas");
+var txtCtx = txtCanvas.getContext("2d");
+txtCtx.font = txtH + "px " + font;
+txtCtx.textBaseline = "middle";
+var txtW = Math.floor(txtCtx.measureText(txt).width);
+txtCanvas.width = txtW;
+txtCanvas.height = txtH*1.5;
+
+var gradient = ctx.createRadialGradient(w2, h2, 0, w2, h2, txtW);
+gradient.addColorStop(0, rayColor2);
+gradient.addColorStop(1, rayColor1);
+ctx.strokeStyle = gradient;
+
+txtCtx.fillStyle = gradient;
+txtCtx.font = txtH + "px " + font;
+txtCtx.textBaseline = "middle";
+txtCtx.fillText(txt,0,txtH*.5);
+
+//dirty adjust for descends
+txtH *= 1.5;
+
+var bufferCanvas = document.createElement("canvas");
+bufferCanvas.width = txtW;
+bufferCanvas.height = txtH;
+var buffer = bufferCanvas.getContext("2d");
+
+//text start position
+var sx = (cw-txtW)*0.5
+var sy = (ch-txtH)*0.5
+
+////generate data
+var rays = [];
+var txtData = txtCtx.getImageData(0,0,txtW,txtH);
+for (var i = 0; i < txtData.data.length; i+=4) {
+  var ii = i/4;
+  var row = Math.floor(ii/txtW)
+  var col = ii%txtW
+  var alpha = txtData.data[i+3]
+  if(alpha !== 0){
+    var c = "rgba("
+    c += [txtData.data[i],txtData.data[i+1],txtData.data[i+2], alpha/255 ] 
+    c += ")";
+    rays.push(new Ray(Math.floor(ii/txtW), ii%txtW, c));  
+  }
+}
+
+var current = 1;
+//start animation
+tick();
+
+function tick() {
+  ctx.clearRect(0,0,cw,ch)
+  ctx.drawImage(bufferCanvas, 0, 0, current, txtH, sx, sy, current, txtH)
+  ctx.save()
+  ctx.globalAlpha = .07;
+  ctx.globalCompositeOperation = "lighter";
+  if(drawRays(current)){
+    current++;
+    current = Math.min(current, txtW)
+    window.requestAnimationFrame(tick)  
+  }else{
+    fadeOut()
+  }
+  ctx.restore()
+}
+
+function fadeOut(){
+  ctx.clearRect(0,0,cw,ch)
+  ctx.globalAlpha *= .95;
+  ctx.drawImage(bufferCanvas, 0, 0, current, txtH, sx, sy, current, txtH)
+  if(ctx.globalAlpha > .01){
+   window.requestAnimationFrame(fadeOut) 
+  }else{
+    window.setTimeout(restart, 500)
+  }
+}
+function restart(){
+  for(var i = 0; i < rays.length; i++){
+    rays[i].reset()
+  }
+  ctx.globalAlpha = 1
+  buffer.clearRect(0,0,txtW,txtH)
+  current = 1;
+  tick();
+}
+function drawRays(c){
+  var count = 0;
+  ctx.beginPath()
+  for(var i = 0; i < rays.length; i++){
+    var ray = rays[i];
+    if(ray.col < c){
+      count += ray.draw()
+    }
+  }
+  ctx.stroke()
+  return count !== rays.length;
+}
+
+function filterRays(r){
+  return Boolean(r);
+}
+
+function Ray(row, col, f){
+  this.col = col;
+  this.row = row;
+  
+  var xp = sx + col;
+  var yp = sy + row;
+  var fill = f;
+  
+  var ath = (txtH/1.5) 
+  
+  var a = pi2 * (this.row - ath*.5) / ath;
+  if(a === 0){
+    a = (Math.random() - .5) * pi2;
+  }
+  var da = .02 * Math.sign(a);
+  da += (Math.random() - .5) * .005;
+  var l = 0;
+  var dl = Math.random()*2 + 2;
+  
+  var buffered = false;
+  this.reset = function(){
+    a = pi2 * (this.row - ath*.5) / ath;
+    if(a === 0){
+      a = -pi2*.5;
+    }
+    l = 0;
+    buffered = false
+  }
+  this.draw = function(){
+    if(l < 0){
+      if(!buffered){
+        buffer.fillStyle = fill;
+        buffer.fillRect(this.col, this.row, 1, 1);
+        buffered = true
+      }
+      return 1;
+    }else{
+      ctx.moveTo(xp, yp)
+      ctx.lineTo(xp + Math.cos(a) * l, yp + Math.sin(a) * l);
+      a += da;
+      l += Math.cos(a)*dl;
+      return 0;
+    }
+  }
+}
+</script>
+<script>
+var RENDERER = {
+	GRAVITY : 0.05,
+	BASE_RATE : 0.6,
+	OFFSET_RATE : 1 / 50,
+	PARTICLE_COUNT : 30,
+	
+	init : function(){
+		this.setParameters();
+		this.setup();
+		this.reconstructMethods();
+		this.bindEvent();
+		this.render();
+	},
+	setParameters : function(){
+		this.$window = $(window);
+		this.$container = $('#jsi-fountain-container');
+		this.$canvas = $('<canvas />');
+		this.context = this.$canvas.appendTo(this.$container).get(0).getContext('2d');
+		this.particles = [];
+		this.fountains = [];
+		this.resizeIds = [];
+	},
+	setup : function(){
+		this.particles.length = 0;
+		this.fountains.length = 0;
+		this.resizeIds.length = 0;
+		this.width = this.$container.width();
+		this.height = this.$container.height();
+		this.$canvas.attr({width : this.width, height : this.height});
+		this.velocity = 1;
+		
+		while(true){
+			var distance = 0,
+				velocity = this.velocity;
+				
+			while(velocity >= 0){
+				velocity -= this.GRAVITY;
+				distance += velocity;
+			}
+			if(distance > Math.min(this.height * (this.BASE_RATE - this.OFFSET_RATE), 500)){
+				this.velocity--;
+				break;
+			}
+			this.velocity++;
+		}
+		this.gradient = this.context.createLinearGradient(0, this.height * this.BASE_RATE, 0, this.height);
+		this.gradient.addColorStop(0, 'hsla(210, 80%, 5%, 0.5)');
+		this.gradient.addColorStop(0.1, 'hsla(210, 80%, 5%, 0.8)');
+		this.gradient.addColorStop(1, 'hsla(210, 80%, 5%, 1)');
+		this.createElements();
+	},
+	createElements : function(){
+		for(var i = 0, count = this.PARTICLE_COUNT * this.width / 500  * this.height / 500; i < count; i++){
+			this.particles.push(new PARTICLE(this));
+		}
+		for(var i = -2; i <= 2; i++){
+			this.fountains.push(new FOUNTAIN(this, this.width / 2 + i * Math.max(250, this.width / 5), this.height * (this.BASE_RATE - this.OFFSET_RATE), i));
+		}
+	},
+	watchWindowSize : function(){
+		while(this.resizeIds.length > 0){
+			clearTimeout(this.resizeIds.pop());
+		}
+		this.tmpWidth = this.$window.width();
+		this.tmpHeight = this.$window.height();
+		this.resizeIds.push(setTimeout(this.jdugeToStopResize, this.RESIZE_INTERVAL));
+	},
+	jdugeToStopResize : function(){
+		var width = this.$window.width(),
+			height = this.$window.height(),
+			stopped = (width == this.tmpWidth && height == this.tmpHeight);
+			
+		this.tmpWidth = width;
+		this.tmpHeight = height;
+		
+		if(stopped){
+			this.setup();
+		}
+	},
+	reconstructMethods : function(){
+		this.watchWindowSize = this.watchWindowSize.bind(this);
+		this.jdugeToStopResize = this.jdugeToStopResize.bind(this);
+		this.render = this.render.bind(this);
+	},
+	bindEvent : function(){
+		this.$window.on('resize', this.watchWindowSize);
+	},
+	getRandomValue : function(min, max){
+		return min + (max - min) * Math.random();
+	},
+	render : function(){
+		requestAnimationFrame(this.render);
+		this.context.fillStyle = 'hsla(0, 0%, 0%, 0.3)';
+		this.context.fillRect(0, 0, this.width, this.height);
+		this.context.save();
+		this.context.globalCompositeOperation = 'lighter';
+		
+		for(var i = 0, count = this.particles.length; i < count; i++){
+			this.particles[i].render(this.context);
+		}
+		for(var i = 0, count = this.fountains.length; i < count; i++){
+			this.fountains[i].render(this.context);
+		}
+		this.context.restore();
+		this.context.save();
+		this.context.translate(0, this.height * this.BASE_RATE);
+		this.context.scale(1, -(1 - this.BASE_RATE) / this.BASE_RATE);
+		this.context.drawImage(this.$canvas.get(0), 0, 0, this.width, this.height * this.BASE_RATE, 0,  -this.height * this.BASE_RATE, this.width, this.height * this.BASE_RATE);
+		this.context.restore();
+		this.context.fillStyle = this.gradient;
+		this.context.fillRect(0, this.height * this.BASE_RATE, this.width, this.height * (1 - this.BASE_RATE));
+	}
+};
+var PARTICLE = function(renderer){
+	this.renderer = renderer;
+	this.init();
+};
+PARTICLE.prototype = {
+	THRESHOLD : 10,
+	
+	init : function(){
+		this.x = this.renderer.getRandomValue(-this.THRESHOLD, this.renderer.width + this.THRESHOLD);
+		this.y = this.renderer.getRandomValue(-this.THRESHOLD, this.renderer.height * this.renderer.BASE_RATE + this.THRESHOLD);
+		this.vx = this.renderer.getRandomValue(-0.3, 0.3);
+		this.vy = this.renderer.getRandomValue(-0.3, 0.3);
+		this.theta = this.renderer.getRandomValue(0, Math.PI * 2);
+		this.deltaTheta = this.renderer.getRandomValue(Math.PI / 300, Math.PI / 100);
+	},
+	getColor : function(){
+		var baseIndex = -1,
+			fountains = this.renderer.fountains,
+			hue = 0;
+			
+		for(var i = 0, count = fountains.length; i < count; i++){
+			if(this.x < fountains[i].x){
+				break;
+			}
+			baseIndex = i;
+		}
+		if(baseIndex == -1){
+			hue = fountains[0].hue;
+		}else if(baseIndex == fountains.length - 1){
+			hue = fountains[fountains.length - 1].hue;
+		}else{
+			var dx1 = this.x - fountains[baseIndex].x,
+				dx2 = fountains[baseIndex + 1].x - this.x;
+			hue = fountains[baseIndex].hue * (dx2 / (dx1 + dx2)) + fountains[baseIndex + 1].hue * (dx1 / (dx1 + dx2));
+		}
+		return 'hsl(' + hue + ', 60%, ' + (15 * (1 + Math.sin(this.theta))) + '%)';
+	},
+	render : function(context){
+		context.save();
+		context.fillStyle = this.getColor();
+		context.beginPath();
+		context.arc(this.x, this.y, 1, 0, Math.PI * 2, false);
+		context.fill();
+		context.restore();
+		
+		this.x += this.vx;
+		this.y += this.vy;
+		this.theta += this.deltaTheta;
+		this.theta %= Math.PI * 2;
+		
+		if(this.x < -this.THRESHOLD && this.vx < 0 || this.x > this.renderer.width + this.THRESHOLD && this.vx > 0){
+			this.vx *= -1;
+		}
+		if(this.y < -this.THRESHOLD && this.vy < 0 || this.y > this.renderer.height * this.renderer.BASE_RATE + this.THRESHOLD && this.vy > 0){
+			this.vy *= -1;
+		}
+	}
+};
+var FOUNTAIN = function(renderer, x, y, index){
+	this.renderer = renderer;
+	this.x = x;
+	this.y = y;
+	this.index = index;
+	this.init();
+};
+FOUNTAIN.prototype = {
+	init : function(){
+		this.waterLines = [];
+		this.hue = 60;
+		this.destinationHue = this.hue + 72 * this.index;
+		this.waitCount = Math.abs(this.index) * 100;
+		this.count = 0;
+		this.theta = 0;
+		this.status = 0;
+	},
+	controlStatus : function(){
+		switch(this.status){
+		case 0:
+			if(++this.count >= this.waitCount){
+				this.status = 1;
+			}
+			break;
+		case 1:
+			if(++this.count >= 300){
+				this.status = 2;
+				this.count = 0;
+			}
+			break;
+		case 2:
+			this.hue += this.index;
+			
+			if(this.hue == this.destinationHue){
+				this.status = 3;
+			}
+			break;
+		case 3:
+			if(++this.count == 300){
+				this.status = 4;
+				this.count = 0;
+			}
+			break;
+		case 4:
+			this.theta += Math.PI / 50;
+			this.theta %= Math.PI * 2;
+			
+			if(this.count++ == 25){
+				this.status = 3;
+			}
+		}
+		return this.status > 0;
+	},
+	render : function(context){
+		var hue = this.hue + Math.sin(this.theta) * 36;
+		context.save();
+		context.fillStyle = 'hsl(' + hue + ', 70%, 30%)';
+		context.translate(this.x, this.y);
+		context.scale(1, 0.3);
+		context.beginPath();
+		context.arc(0, 0, 10, 0, Math.PI * 2, false);
+		context.fill();
+		context.restore();
+		
+		if(!this.controlStatus()){
+			return;
+		}
+		context.save();
+		context.translate(this.x, this.y);
+		
+		for(var i = this.waterLines.length - 1; i >= 0; i--){
+			if(!this.waterLines[i].render(context, hue)){
+				this.waterLines.splice(i, 1);
+			}
+		}
+		context.restore();
+		this.waterLines.push(new WATER_LINE(this.renderer));
+	}
+};
+var WATER_LINE = function(renderer){
+	this.renderer = renderer;
+	this.init();
+};
+WATER_LINE.prototype = {
+	MAX_TRACES : 80,
+	
+	init : function(){
+		var theta = this.renderer.getRandomValue(-Math.PI / 20, Math.PI / 20),
+			rate = this.renderer.getRandomValue(0.8, 1);
+		this.x = this.renderer.getRandomValue(-2, 2);
+		this.y = 0;
+		this.vx = this.renderer.velocity * Math.sin(theta) * rate;
+		this.vy = -this.renderer.velocity * Math.cos(theta * this.renderer.getRandomValue(3, 6)) * rate;
+		this.opacity = 1;
+		this.luminance = 0;
+		this.traces = [];
+	},
+	render : function(context, hue){
+		this.traces.push({x : this.x, y : this.y});
+		
+		if(this.traces.length > this.MAX_TRACES){
+			this.traces.shift();
+		}
+		context.save();
+		context.strokeStyle = 'hsla(' + hue + ', 70%, ' + this.luminance + '%, ' + this.opacity + ')';
+		context.beginPath();
+		context.moveTo(this.traces[0].x, this.traces[0].y);
+		
+		for(var i = 1, count = this.traces.length; i < count; i++){
+			context.lineTo(this.traces[i].x, this.traces[i].y);
+		}
+		context.stroke();
+		context.restore();
+		this.x += this.vx;
+		this.y += this.vy;
+		this.vy += this.renderer.GRAVITY;
+		
+		if(this.vy > 0){
+			this.opacity -= 0.02;
+		}
+		if(this.luminance < 10){
+			this.luminance += 0.1;
+		}
+		return this.opacity > 0;
+	}
+};
+$(function(){
+	RENDERER.init();
+});
+</script>
+
+<div style="text-align:center;clear:both;">
+<script src="/gg_bd_ad_720x90.js" type="text/javascript"></script>
+<script src="/follow.js" type="text/javascript"></script>
+</div>
+
+</body>
+</html>
