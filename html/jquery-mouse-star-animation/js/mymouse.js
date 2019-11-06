@@ -3989,11 +3989,11 @@
 			mouseY: 0,
 			init: function() {
 				for (i = 0; i < 1; i++) {
-					var j = "images/subball" + (i + 1) + ".png";
+					var j = "https://cdn.jsdelivr.net/gh/liucm-it/CDN/html/jquery-mouse-star-animation/images/subball" + (i + 1) + ".png";
 					giffy_bp_0013.ballImageResource[i] = new Image;
 					giffy_bp_0013.ballImageResource[i].src = j
 				}
-				for (i = 0; i < 8; i++) j = "images/subball" + (i + 1) + ".png", giffy_bp_0013.subBallImageResource[i] =
+				for (i = 0; i < 8; i++) j = "https://cdn.jsdelivr.net/gh/liucm-it/CDN/html/jquery-mouse-star-animation/images/subball" + (i + 1) + ".png", giffy_bp_0013.subBallImageResource[i] =
 					new Image, giffy_bp_0013.subBallImageResource[i].src = j;
 				for (i = 0; i < 20; i++) {
 					giffy_bp_0013.ball[i] = q("<div />", {
