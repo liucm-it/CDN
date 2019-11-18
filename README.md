@@ -1,2 +1,2 @@
-# CDN-for-itrhx.com
-jsDeliver CDN-for-itrhx.com
+# CDN-for-liuchaoming.cn
+jsDeliver CDN-for-liuchaoming.cn
